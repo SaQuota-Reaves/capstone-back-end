@@ -10,6 +10,7 @@ const db = new pg.Client({
     database: "Therapist",
 });
 
+// process.env.DATABASE_URL
 db.connect();
 
 server.get("/", (req, res) => {
