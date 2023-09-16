@@ -1,10 +1,68 @@
-const express = require("express");
-const cors = require("cors");
-const pg = require("pg");
+import { Clerk } from "@clerk/backend";
+import clerkAPIKey from "./clerkAPIKey.js";
+import express from "express";
+import cors from "cors";
+import pg from "pg";
 
 const server = express();
 server.use(cors());
 server.use(express.json());
+
+const clerk = Clerk({
+    apiKey: clerkAPIKey,
+});
+
+const validateUserTokenMiddleware = async (req, res, next) => {
+    const header = req.headers.authorization;
+    if (!header) {
+        res.status(401).send({ error: "Authorization header not specified!" });
+        return;
+    }
+
+    const headerParts = header.split(" ");
+    if (headerParts.length !== 2) {
+        res.status(401).send({
+            error: `Malformed Authorization header - expected two words, found ${headerParts.length}`,
+        });
+        return;
+    }
+
+    if (headerParts[0] !== "Bearer") {
+        res.status(401).send({
+            error: `Malformed Authorization header - expected Bearer scheme, found ${headerParts[0]}`,
+        });
+        return;
+    }
+
+    const token = headerParts[1];
+    if (token.length === 0) {
+        res.status(401).send({
+            error: "Malformed Authorization header - missing token!",
+        });
+        return;
+    }
+
+    const publicKey = fs.readFileSync("./clerk-public-key.pem", {
+        encoding: "utf-8",
+    });
+    let decoded;
+    try {
+        decoded = jwt.verify(token, publicKey);
+        console.log(decoded);
+    } catch (err) {
+        console.error("Error validating token:", error.message);
+        res.status(401).json({
+            error: "Malformed Authorization header - invalid token!",
+        });
+        return;
+    }
+
+    const userDetails = await clerk.users.getUser(decoded.sub);
+
+    req.auth = { clerkUserID: decoded.sub, userDetails };
+
+    next();
+};
 
 const db = new pg.Client({
     database: "Therapist",
